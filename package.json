@@ -1,0 +1,9 @@
+{
+  "name": "boltpreload",
+  "private": true,
+  "type": "module",
+  "description": "Static site: no build step. package.json exists only so Node runs the tests as ES modules.",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\""
+  }
+}

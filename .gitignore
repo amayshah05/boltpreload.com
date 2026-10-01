@@ -1,0 +1,6 @@
+refs/
+.DS_Store
+.claude/
+node_modules/
+SPEC.md
+PROMPT.md
