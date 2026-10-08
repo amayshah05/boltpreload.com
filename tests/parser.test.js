@@ -11,7 +11,7 @@ const data = JSON.parse(fs.readFileSync(new URL('../data/fastener_standards.json
 const titlesText = fs.readFileSync(new URL('./titles.txt', import.meta.url), 'utf8');
 
 // Expected results for every block in tests/titles.txt, keyed by the joined title.
-// status: 'ok' = SHCS with a thread found; 'not_shcs' = must fail the SHCS scope.
+// status: 'ok' = socket or hex head with a thread found; 'out_of_scope' = any other head.
 const REAL = {
   'Zinc-Plated Alloy Steel Socket Head Screw US Origin, 1/4"-20 Thread Size, 1" Long':
     { status: 'ok', thread: '1/4-20 UNC', material: 'alloy_steel', finish: 'zinc-plated', grade: 'ASTM-A574', inferred: true },
@@ -22,17 +22,17 @@ const REAL = {
   '18-8 Stainless Steel Socket Head Screws M5 x 0.5 mm Thread Size, 25 mm Long, Fully Threaded':
     { status: 'ok', thread: 'M5x0.5', material: 'ss_18_8', finish: null, grade: 'ISO3506-A2-70', inferred: true },
   'Zinc-Plated Steel Pan Head Phillips Screw 8-32 Thread, 1-1/8" Long':
-    { status: 'not_shcs', head: 'pan head screw', thread: '#8-32 UNC', material: 'steel', finish: 'zinc-plated', grade: null },
+    { status: 'out_of_scope', head: 'pan head screw', thread: '#8-32 UNC', material: 'steel', finish: 'zinc-plated', grade: null },
   'Brass Button Head Hex-Drive Screw 10-24 Thread Size, 1-1/8" Long':
-    { status: 'not_shcs', head: 'button head screw', thread: '#10-24 UNC', material: 'other', finish: null, grade: null },
+    { status: 'out_of_scope', head: 'button head screw', thread: '#10-24 UNC', material: 'other', finish: null, grade: null },
   '18-8 Stainless Steel Shoulder Screw 1/8" Shoulder Diameter, 2" Shoulder Length, 4-40 Thread Size':
-    { status: 'not_shcs', head: 'shoulder screw', thread: '#4-40 UNC', material: 'ss_18_8', finish: null, grade: 'ASTM-F593-G1-CW', inferred: true },
+    { status: 'out_of_scope', head: 'shoulder screw', thread: '#4-40 UNC', material: 'ss_18_8', finish: null, grade: 'ASTM-F593-G1-CW', inferred: true },
   '18-8 Stainless Steel Slotted Flat Head Screw M1.6 x 0.35 mm Thread Size, 2 mm Long':
-    { status: 'not_shcs', head: 'flat head screw', thread: 'M1.6x0.35', material: 'ss_18_8', finish: null, grade: 'ISO3506-A2-70', inferred: true },
+    { status: 'out_of_scope', head: 'flat head screw', thread: 'M1.6x0.35', material: 'ss_18_8', finish: null, grade: 'ISO3506-A2-70', inferred: true },
   'Mil. Spec. Steel Socket Head Screw 3/8"-16 Thread Size, 1" Long':
     { status: 'ok', thread: '3/8-16 UNC', material: 'steel', finish: null, grade: null },
   'Medium-Strength Grade 5 Steel Hex Head Screw Zinc-Plated, 1/4"-20 Thread Size, 3-1/2" Long, Partially Threaded':
-    { status: 'not_shcs', head: 'hex head screw', thread: '1/4-20 UNC', material: 'steel', finish: 'zinc-plated', stated: 'SAE-J429-5', grade: 'SAE-J429-5', inferred: false },
+    { status: 'ok', head: 'hex head screw', product: 'hex', thread: '1/4-20 UNC', material: 'steel', finish: 'zinc-plated', stated: 'SAE-J429-5', grade: 'SAE-J429-5', inferred: false },
   'Black-Oxide Alloy Steel Socket Head Screw US Origin, 1/2"-20 Thread Size, 1" Long':
     { status: 'ok', thread: '1/2-20 UNF', material: 'alloy_steel', finish: 'black-oxide', grade: 'ASTM-A574', inferred: true },
   'Black-Oxide Alloy Steel Socket Head Screw M14 x 2 mm Thread Size, 20 mm Long':
@@ -76,9 +76,54 @@ const SYNTHETIC = {
   // must fail: not a standard pitch
   'Alloy Steel Socket Head Screw M6 x 0.6 mm Thread Size, 20 mm Long':
     { status: 'unknown_thread', thread: null, material: 'alloy_steel' },
-  // must fail: not a socket head screw and no thread
+  // must fail: out of scope and no thread
   'Zinc-Plated Steel Hex Nut':
-    { status: 'not_shcs', head: 'nut', thread: null },
+    { status: 'out_of_scope', head: 'nut', thread: null },
+};
+
+// Hex head cap screws (SPEC §9), synthetic titles in McMaster's format. The
+// real hex title in titles.txt is covered above.
+const HEX = {
+  // stated SAE grade, zinc yellow-chromate finish
+  'High-Strength Grade 8 Steel Hex Head Screw Zinc Yellow-Chromate Plated, 3/8"-16 Thread Size, 1-1/2" Long, Partially Threaded':
+    { status: 'ok', product: 'hex', thread: '3/8-16 UNC', material: 'steel', finish: 'zinc-plated', stated: 'SAE-J429-8', grade: 'SAE-J429-8', inferred: false },
+  // stated metric class
+  'Medium-Strength Class 8.8 Steel Hex Head Screw Zinc-Plated, M8 x 1.25 mm Thread, 30 mm Long':
+    { status: 'ok', product: 'hex', thread: 'M8x1.25', material: 'steel', stated: 'ISO-8.8', grade: 'ISO-8.8', inferred: false },
+  // inch stainless -> ASTM F593, which covers hex cap screws directly
+  '18-8 Stainless Steel Hex Head Screw 1/4"-20 Thread Size, 1" Long':
+    { status: 'ok', product: 'hex', thread: '1/4-20 UNC', material: 'ss_18_8', grade: 'ASTM-F593-G1-CW', inferred: true },
+  '316 Stainless Steel Hex Head Screw 1/2"-13 Thread Size, 2" Long':
+    { status: 'ok', product: 'hex', thread: '1/2-13 UNC', material: 'ss_316', grade: 'ASTM-F593-G2-CW', inferred: true },
+  // numbered size: grade inferred, but Sp is null below 1/4 in (calculator test)
+  '18-8 Stainless Steel Hex Head Screw 10-24 Thread Size, 1/2" Long':
+    { status: 'ok', product: 'hex', thread: '#10-24 UNC', material: 'ss_18_8', grade: 'ASTM-F593-G1-CW', inferred: true },
+  // metric stainless
+  '18-8 Stainless Steel Hex Head Screw M6 x 1 mm Thread, 20 mm Long':
+    { status: 'ok', product: 'hex', thread: 'M6x1', material: 'ss_18_8', grade: 'ISO3506-A2-70', inferred: true },
+  '316 Stainless Steel Hex Head Screw M10 x 1.5 mm Thread, 30 mm Long':
+    { status: 'ok', product: 'hex', thread: 'M10x1.5', material: 'ss_316', grade: 'ISO3506-A4-70', inferred: true },
+  // alloy steel with no stated grade: no inference (not A574, not 12.9)
+  'Alloy Steel Hex Head Screw 1/2"-13 Thread Size, 2" Long':
+    { status: 'ok', product: 'hex', thread: '1/2-13 UNC', material: 'alloy_steel', grade: null },
+  'Black-Oxide Alloy Steel Hex Head Screw M12 x 1.75 mm Thread, 40 mm Long':
+    { status: 'ok', product: 'hex', thread: 'M12x1.75', material: 'alloy_steel', finish: 'black-oxide', grade: null },
+  // steel without alloy or grade
+  'Low-Strength Steel Hex Head Screw Zinc-Plated, 1/4"-20 Thread Size, 1" Long':
+    { status: 'ok', product: 'hex', thread: '1/4-20 UNC', material: 'steel', grade: null },
+  // stated grade that covers socket heads only
+  'ASTM A574 Alloy Steel Hex Head Screw 1/4"-20 Thread Size, 1" Long':
+    { status: 'ok', product: 'hex', thread: '1/4-20 UNC', stated: 'ASTM-A574', grade: null },
+  // "hex cap screw" wording
+  'Grade 5 Steel Hex Cap Screw 5/8"-11 Thread Size, 2" Long':
+    { status: 'ok', product: 'hex', head: 'hex head screw', thread: '5/8-11 UNC', stated: 'SAE-J429-5', grade: 'SAE-J429-5', inferred: false },
+  // must fail: bearing face larger than Shigley's 1.5d
+  'Zinc-Plated Grade 5 Steel Serrated Flange Hex Head Screw 5/16"-18 Thread Size, 1" Long':
+    { status: 'out_of_scope', product: null, head: 'flanged hex head screw', thread: '5/16-18 UNC' },
+  'Zinc-Plated Steel Hex Washer Head Screw 10-24 Thread Size, 1/2" Long':
+    { status: 'out_of_scope', product: null, head: 'hex washer head screw', thread: '#10-24 UNC' },
+  'High-Strength Grade 8 Steel Heavy Hex Head Screw 3/4"-10 Thread Size, 3" Long':
+    { status: 'out_of_scope', product: null, head: 'heavy hex head screw', thread: '3/4-10 UNC' },
 };
 
 function check(title, exp) {
@@ -86,6 +131,7 @@ function check(title, exp) {
   assert.equal(p.status, exp.status, 'status');
   assert.equal(p.ok, exp.status === 'ok', 'ok flag');
   assert.equal(p.thread?.id ?? null, exp.thread, 'thread');
+  if ('product' in exp) assert.equal(p.product, exp.product, 'product');
   if ('material' in exp) assert.equal(p.material?.key ?? null, exp.material, 'material');
   if ('finish' in exp) assert.equal(p.finish?.key ?? null, exp.finish, 'finish');
   if ('head' in exp) assert.equal(p.headType, exp.head, 'head type');
@@ -117,6 +163,10 @@ for (const [title, exp] of Object.entries(SYNTHETIC)) {
   test(`synthetic title: ${title}`, () => check(title, exp));
 }
 
+for (const [title, exp] of Object.entries(HEX)) {
+  test(`hex title: ${title}`, () => check(title, exp));
+}
+
 // ------------------------------------------------------------ SPEC §9 coverage
 
 test('coverage: at least 12 titles, at least 2 that must fail', () => {
@@ -124,6 +174,22 @@ test('coverage: at least 12 titles, at least 2 that must fail', () => {
   assert.ok(all.length >= 12);
   const failing = all.filter((t) => !parseTitle(t, data).ok);
   assert.ok(failing.length >= 2);
+});
+
+test('coverage: at least 8 hex head titles, plus flanged, hex washer and heavy hex failures', () => {
+  const hex = [...blocks, ...Object.keys(HEX)].filter((t) => parseTitle(t, data).product === 'hex');
+  assert.ok(hex.length >= 8);
+  const heads = Object.keys(HEX).map((t) => parseTitle(t, data)).filter((p) => !p.inScope).map((p) => p.headType);
+  assert.deepEqual(heads.sort(), ['flanged hex head screw', 'heavy hex head screw', 'hex washer head screw']);
+});
+
+test('every socket head title is still in scope as a socket head', () => {
+  const all = { ...REAL, ...SYNTHETIC };
+  for (const t of Object.keys(all).filter((x) => /socket head/i.test(x))) {
+    const p = parseTitle(t, data);
+    assert.equal(p.product, 'shcs', t);
+    assert.equal(p.isSHCS, true, t);
+  }
 });
 
 // ------------------------------------------------------------ details
@@ -160,6 +226,38 @@ test('stated SAE grade on a metric thread is not applied', () => {
   const g = selectGrade(p, data);
   assert.equal(g.gradeId, null);
   assert.match(g.message, /inch grade/);
+});
+
+test('head type drives grade inference: alloy steel infers A574 for socket heads only', () => {
+  const hex = parseTitle('Alloy Steel Hex Head Screw 1/2"-13 Thread Size, 2" Long', data);
+  assert.equal(selectGrade(hex, data).gradeId, null);
+  assert.match(selectGrade(hex, data).message, /A574 covers socket heads only/);
+  assert.equal(selectGrade(hex, data, 'shcs').gradeId, 'ASTM-A574');      // user switches to socket head
+  const shcs = parseTitle('Alloy Steel Socket Head Screw 1/2"-13 Thread Size, 2" Long', data);
+  assert.equal(selectGrade(shcs, data, 'hex').gradeId, null);              // user switches to hex head
+  const metric = parseTitle('Alloy Steel Hex Head Screw M8 x 1.25 mm Thread, 20 mm Long', data);
+  assert.equal(selectGrade(metric, data, 'shcs').gradeId, 'ISO-12.9');
+  assert.equal(selectGrade(metric, data, 'hex').gradeId, null);
+});
+
+test('a stated socket-head-only grade is not applied to a hex head', () => {
+  const g = selectGrade(parseTitle('ASTM A574 Alloy Steel Hex Head Screw 1/4"-20 Thread Size', data), data);
+  assert.equal(g.gradeId, null);
+  assert.match(g.message, /does not cover hex head cap screws/);
+});
+
+test('large-bearing-face hex variants explain why they are out of scope', () => {
+  for (const t of ['Serrated Flange Hex Head Screw 1/4"-20', 'Hex Washer Head Screw 10-24', 'Heavy Hex Head Screw 1/2"-13']) {
+    const p = parseTitle(t, data);
+    assert.equal(p.status, 'out_of_scope', t);
+    assert.match(p.errors[0], /bearing face is larger than the 1\.5d/, t);
+  }
+});
+
+test('hex nuts are still nuts, not hex head screws', () => {
+  for (const t of ['Zinc-Plated Steel Hex Nut', 'Grade 8 Steel Heavy Hex Nut 1/2"-13', 'Steel Flange Nut 1/4"-20']) {
+    assert.equal(parseTitle(t, data).headType, 'nut', t);
+  }
 });
 
 test('empty input', () => {

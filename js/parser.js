@@ -88,12 +88,17 @@ function describe(c) {
 
 // ------------------------------------------------------------ head, material, grade, finish
 
+// First match wins. The hex variants with a larger bearing face come before
+// plain hex head (SPEC §1).
 const HEADS = [
   [/socket[\s-]*head/i, 'socket head'],
   [/button[\s-]*head/i, 'button head screw'],
   [/flat[\s-]*head/i, 'flat head screw'],
   [/pan[\s-]*head/i, 'pan head screw'],
-  [/hex[\s-]*head/i, 'hex head screw'],
+  [/heavy[\s-]*hex[\s-]*(?:head|cap|screw|bolt)/i, 'heavy hex head screw'],
+  [/hex[\s-]*washer[\s-]*head/i, 'hex washer head screw'],
+  [/flange[ds]?[\s-]*(?:hex[\s-]*)?(?:head|screw|bolt)|hex[\s-]*(?:head[\s-]*)?flange[ds]?[\s-]*(?:screw|bolt)/i, 'flanged hex head screw'],
+  [/hex[\s-]*head|hex[\s-]*cap[\s-]*screw/i, 'hex head screw'],
   [/shoulder[\s-]*screw/i, 'shoulder screw'],
   [/set[\s-]*screw/i, 'set screw'],
   [/thumb[\s-]*screw/i, 'thumb screw'],
@@ -107,6 +112,16 @@ function detectHead(s) {
   for (const [re, name] of HEADS) if (re.test(s)) return name;
   return null;
 }
+
+// In-scope head types -> product id used by the data ('products' fields).
+const PRODUCT_OF_HEAD = { 'socket head': 'shcs', 'hex head screw': 'hex' };
+
+const LARGE_BEARING_FACE = ' Its bearing face is larger than the 1.5d that Shigley\'s K assumes (p. 430).';
+const SCOPE_REASONS = {
+  'heavy hex head screw': LARGE_BEARING_FACE,
+  'hex washer head screw': LARGE_BEARING_FACE,
+  'flanged hex head screw': LARGE_BEARING_FACE,
+};
 
 const OTHER_MATERIALS = /\b(brass|bronze|aluminum|aluminium|titanium|nylon|plastic|peek|copper|a286|inconel|monel|hastelloy|zinc alloy)\b/i;
 
@@ -154,17 +169,20 @@ function detectFinish(s) {
 // ------------------------------------------------------------ public API
 
 // Returns:
-// { ok, status: 'ok' | 'not_shcs' | 'no_thread' | 'unknown_thread' | 'empty',
-//   errors[], notes[], normalized, isSHCS, headType, thread (dataset row) | null,
+// { ok, status: 'ok' | 'out_of_scope' | 'no_thread' | 'unknown_thread' | 'empty',
+//   errors[], notes[], normalized, headType, product: 'shcs' | 'hex' | null,
+//   inScope, isSHCS, thread (dataset row) | null,
 //   threadText, rawThread, material, statedGrade, finish }
 export function parseTitle(raw, data) {
   const s = normalizeTitle(raw);
-  const res = { ok: false, status: 'empty', errors: [], notes: [], normalized: s, isSHCS: false,
-    headType: null, thread: null, threadText: null, rawThread: null, material: null, statedGrade: null, finish: null };
+  const res = { ok: false, status: 'empty', errors: [], notes: [], normalized: s, headType: null, product: null,
+    inScope: false, isSHCS: false, thread: null, threadText: null, rawThread: null, material: null, statedGrade: null, finish: null };
   if (!s) return res;
 
   res.headType = detectHead(s);
-  res.isSHCS = res.headType === 'socket head';
+  res.product = PRODUCT_OF_HEAD[res.headType] ?? null;
+  res.inScope = res.product != null;
+  res.isSHCS = res.product === 'shcs';
   res.material = detectMaterial(s);
   res.statedGrade = detectGrade(s);
   res.finish = detectFinish(s);
@@ -197,13 +215,13 @@ export function parseTitle(raw, data) {
     }
   }
 
-  if (!res.isSHCS) {
+  if (!res.inScope) {
     res.errors.unshift(res.headType
-      ? `This looks like a ${res.headType}, not a socket head cap screw. boltpreload.com covers SHCS only; you can still enter values manually.`
-      : 'Not recognized as a socket head screw. boltpreload.com covers SHCS only; you can still enter values manually.');
-    res.status = 'not_shcs';
+      ? `This looks like a ${res.headType}, not a socket head or hex head cap screw.${SCOPE_REASONS[res.headType] ?? ''} boltpreload.com covers those two only; you can still enter values manually.`
+      : 'Not recognized as a socket head or hex head cap screw. boltpreload.com covers those two only; you can still enter values manually.');
+    res.status = 'out_of_scope';
   }
-  res.ok = res.isSHCS && res.thread != null;
+  res.ok = res.inScope && res.thread != null;
   return res;
 }
 
@@ -213,9 +231,19 @@ const MATERIAL_MESSAGES = {
   other: 'No grade data for this material. Choose a grade or enter Sp.',
 };
 
-// SPEC §3 title-to-grade mapping.
+const HEX_MATERIAL_MESSAGES = {
+  alloy_steel: 'Hex head: the grade can\'t be inferred from "alloy steel" (ASTM A574 covers socket heads only, '
+    + 'and 12.9 is the socket head convention). Choose a grade.',
+};
+
+export function productLabel(data, product) {
+  return data.products.options.find((o) => o.id === product)?.label ?? product;
+}
+
+// SPEC §3 title-to-grade mapping for a head type. Titles that are out of
+// scope fall back to the socket head mapping, as for manual entry.
 // Returns { gradeId | null, inferred: boolean, message | null }.
-export function selectGrade(parse, data) {
+export function selectGrade(parse, data, product = parse.product ?? 'shcs') {
   const system = parse.thread?.system ?? parse.rawThread?.system ?? null;
   const stated = parse.statedGrade;
   if (stated) {
@@ -225,12 +253,17 @@ export function selectGrade(parse, data) {
       return { gradeId: null, inferred: false,
         message: `Stated ${stated.text} is ${g.system === 'inch' ? 'an inch' : 'a metric'} grade but the thread is ${system}. Choose a grade.` };
     }
+    if (!g.products.includes(product)) {
+      return { gradeId: null, inferred: false,
+        message: `Stated ${stated.text} does not cover ${productLabel(data, product).toLowerCase()}s. Choose a grade.` };
+    }
     return { gradeId: g.id, inferred: false, message: null };
   }
   if (!system) return { gradeId: null, inferred: false, message: null };
   const key = parse.material?.key;
-  const rule = data.title_grade_map.find((m) => m.system === system && m.material === key);
+  const rule = data.title_grade_map.find((m) => m.product === product && m.system === system && m.material === key);
   if (rule) return { gradeId: rule.grade, inferred: true, message: data.inferred_grade_flag };
   return { gradeId: null, inferred: false,
-    message: MATERIAL_MESSAGES[key] || 'Material not found in the title. Choose a grade.' };
+    message: (product === 'hex' && HEX_MATERIAL_MESSAGES[key]) || MATERIAL_MESSAGES[key]
+      || 'Material not found in the title. Choose a grade.' };
 }

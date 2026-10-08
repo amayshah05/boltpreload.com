@@ -347,13 +347,35 @@ def inch_threads():
 
 
 # ---------------------------------------------------------------------------
+# Head types (SPEC §1). Both use the same K: Shigley's Eq. 8-26 takes the
+# bearing face as a hex washer face, 1.5d across flats (p. 430).
+# ---------------------------------------------------------------------------
+
+ALL_PRODUCTS = ("shcs", "hex")
+SHCS_ONLY = ("shcs",)
+HEX_ONLY = ("hex",)
+
+PRODUCTS = {
+    "options": [
+        {"id": "shcs", "label": "Socket head cap screw", "default": True},
+        {"id": "hex", "label": "Hex head cap screw", "default": False},
+    ],
+    "bearing_face_note": "Shigley's Eq. 8-26 takes the bearing face as a hex washer face, 1.5d across flats "
+                         "(dc = 1.25d), so hex heads use the same K as socket heads. Flanged, hex washer and heavy "
+                         "hex heads bear on a larger face and are out of scope.",
+    "source": "Shigley p. 430 (derivation of Eq. 8-26)",
+    "source_id": "shigley",
+}
+
+
+# ---------------------------------------------------------------------------
 # Grade data (SPEC §3)
 #
 # Each grade holds the size-range rows of every source consulted. Lookup rule
-# (same in the app): among rows whose size range contains d (and whose
-# fine-pitch scope admits the thread), take the lowest "priority";
-# 1 = Shigley Tables 8-9 to 8-11, 2 = governing standard. Lower-priority rows
-# that also match are cross-checks.
+# (same in the app): among rows whose size range contains d and whose
+# "products" include the head type (and whose fine-pitch scope admits the
+# thread), take the lowest "priority"; 1 = Shigley Tables 8-9 to 8-11,
+# 2 = governing standard. Lower-priority rows that also match are cross-checks.
 # ---------------------------------------------------------------------------
 
 SHIGLEY_T8_9 = "Shigley Table 8-9, p. 425"
@@ -365,7 +387,8 @@ FROM_SY = "0.85*Sy (Shigley p.434)"
 
 def row(d_min, d_max, value, unit, source_id, source, method, priority, *,
         d_unit, size_text, verified=True, note="", Sy=None,
-        d_min_exclusive=False, d_max_exclusive=False, fine_pitch_d_min=None):
+        d_min_exclusive=False, d_max_exclusive=False, fine_pitch_d_min=None,
+        products=ALL_PRODUCTS):
     return {
         "d_min": d_min,
         "d_max": d_max,
@@ -373,6 +396,7 @@ def row(d_min, d_max, value, unit, source_id, source, method, priority, *,
         "d_min_exclusive": d_min_exclusive,
         "d_max_exclusive": d_max_exclusive,
         "fine_pitch_d_min": fine_pitch_d_min,
+        "products": list(products),
         "size_text": size_text,
         "value": value,
         "unit": unit,
@@ -417,6 +441,7 @@ def metric_class(cls, material, shigley_rows, iso_rows, note=""):
         "system": "metric",
         "standard": "ISO 898-1",
         "material": material,
+        "products": list(ALL_PRODUCTS),
         "aliases": [f"class {cls}", f"property class {cls}", f"{cls}"],
         "note": note,
         "rows": shigley_rows + iso_rows,
@@ -431,6 +456,7 @@ def stainless_3506(grade, cls, steel):
         "system": "metric",
         "standard": "ISO 3506-1",
         "material": f"austenitic stainless steel ({steel})",
+        "products": list(ALL_PRODUCTS),
         "aliases": [f"{grade}-{cls}", f"{grade.lower()}-{cls}"],
         "note": "",
         "rows": [
@@ -455,6 +481,7 @@ def sae_grade(grade, shigley_rows, j429_rows, material):
         "system": "inch",
         "standard": "SAE J429",
         "material": material,
+        "products": list(ALL_PRODUCTS),
         "aliases": [f"grade {grade}", f"sae grade {grade}", f"sae j429 grade {grade}"],
         "note": "",
         "rows": shigley_rows + j429_rows + [below_quarter],
@@ -482,14 +509,17 @@ def f593_group(group, alloys):
     return {
         "id": f"ASTM-F593-G{group}-CW",
         "label": f"{alloys} stainless, condition CW (ASTM F593 Group {group}; F837 below 1/4 in)",
+        "label_by_product": {"hex": f"{alloys} stainless, condition CW (ASTM F593 Group {group})"},
         "system": "inch",
         "standard": "ASTM F593 / ASTM F837",
         "material": f"austenitic stainless steel ({alloys})",
+        "products": list(ALL_PRODUCTS),
         "condition": "CW (cold worked). F593: the condition furnished unless otherwise specified. "
                      "F837: no default; CW is the lower of its two cold-worked conditions.",
         "aliases": [f"f593 group {group}"],
         "note": "F593 covers bolts, hex cap screws and studs from 1/4 to 1-1/2 in. Below 1/4 in the "
-                "stainless socket-head-cap-screw specification ASTM F837 (condition CW) is used.",
+                "stainless socket-head-cap-screw specification ASTM F837 (condition CW) is used for "
+                "socket heads; hex heads below 1/4 in have no value.",
         "rows": [
             inch(0.25, 0.625, sig(0.85 * 65), "kpsi", "astm_f593", src + "1 (1/4-5/8 in)", FROM_SY, 2,
                  size_text="1/4-5/8 in", Sy=65,
@@ -497,7 +527,14 @@ def f593_group(group, alloys):
             inch(0.75, 1.5, sig(0.85 * 45), "kpsi", "astm_f593", src + "2 (3/4-1-1/2 in)", FROM_SY, 2,
                  size_text="3/4-1-1/2 in", Sy=45,
                  note="F593 gives yield strength 45 ksi min (tensile 85-140 ksi), no proof load."),
-            f837_row(group, "CW", 40, 0.06, 0.25, "#0 to below 1/4 in (F837)", d_max_exclusive=True),
+            f837_row(group, "CW", 40, 0.06, 0.25, "#0 to below 1/4 in (F837)", d_max_exclusive=True,
+                     products=SHCS_ONLY),
+            inch(0.06, 0.25, None, "kpsi", "astm_f593", "ASTM F593 scope (1/4-1-1/2 in)", FROM_SY, 2,
+                 size_text="#0 to below 1/4 in (hex head)", d_max_exclusive=True, verified=False,
+                 products=HEX_ONLY,
+                 note="ASTM F593 covers hex cap screws from 1/4 in, and ASTM F837 covers socket heads only. "
+                      "No verified proof strength for stainless hex heads below 1/4 in; enter Sp from "
+                      "supplier data."),
         ],
     }
 
@@ -509,13 +546,14 @@ def f837_grade(group, alloys, condition, sy):
         "system": "inch",
         "standard": "ASTM F837",
         "material": f"austenitic stainless steel ({alloys})",
+        "products": list(SHCS_ONLY),
         "condition": condition,
         "aliases": [f"f837 group {group} {condition.lower()}"],
         "note": "Stainless socket head cap screws. Above 0.750 in, CW/CW1 properties are by agreement.",
         "rows": [
-            f837_row(group, condition, sy, 0.06, 0.75, "0.060-0.750 in"),
+            f837_row(group, condition, sy, 0.06, 0.75, "0.060-0.750 in", products=SHCS_ONLY),
             inch(0.75, 1.5, None, "kpsi", "astm_f837", "ASTM F837 Table 1, footnote A", FROM_SY, 2,
-                 size_text="over 0.750 in", d_min_exclusive=True, verified=False,
+                 size_text="over 0.750 in", d_min_exclusive=True, verified=False, products=SHCS_ONLY,
                  note="F837 leaves CW/CW1 properties above 0.750 in to agreement between user and "
                       "manufacturer. Enter Sp from supplier data."),
         ],
@@ -582,12 +620,14 @@ def grades():
         "system": "inch",
         "standard": "ASTM A574",
         "material": "alloy steel, quenched and tempered",
+        "products": list(SHCS_ONLY),
         "aliases": ["a574", "astm a574"],
-        "note": "Not in Shigley Table 8-10.",
+        "note": "Not in Shigley Table 8-10. Socket head cap screws only.",
         "rows": [
-            inch(0.06, 0.5, 140, "kpsi", "astm_a574", a574_src, DIRECT, 2, size_text="0.500 in and smaller"),
+            inch(0.06, 0.5, 140, "kpsi", "astm_a574", a574_src, DIRECT, 2, size_text="0.500 in and smaller",
+                 products=SHCS_ONLY),
             inch(0.5, 4.0, 135, "kpsi", "astm_a574", a574_src, DIRECT, 2, size_text="larger than 0.500 in",
-                 d_min_exclusive=True),
+                 d_min_exclusive=True, products=SHCS_ONLY),
         ],
     })
 
@@ -602,13 +642,19 @@ def grades():
 
 # SPEC §3 title-to-grade mapping. "inferred" rows raise the flag
 # "Grade inferred from material - verify against the product page."
+# Hex heads have no alloy-steel rows on purpose: A574 covers socket heads only
+# and 12.9 is the socket-head convention, so the user chooses.
 TITLE_GRADE_MAP = [
-    {"system": "metric", "material": "alloy_steel", "grade": "ISO-12.9"},
-    {"system": "metric", "material": "ss_18_8", "grade": "ISO3506-A2-70"},
-    {"system": "metric", "material": "ss_316", "grade": "ISO3506-A4-70"},
-    {"system": "inch", "material": "alloy_steel", "grade": "ASTM-A574"},
-    {"system": "inch", "material": "ss_18_8", "grade": "ASTM-F593-G1-CW"},
-    {"system": "inch", "material": "ss_316", "grade": "ASTM-F593-G2-CW"},
+    {"product": "shcs", "system": "metric", "material": "alloy_steel", "grade": "ISO-12.9"},
+    {"product": "shcs", "system": "metric", "material": "ss_18_8", "grade": "ISO3506-A2-70"},
+    {"product": "shcs", "system": "metric", "material": "ss_316", "grade": "ISO3506-A4-70"},
+    {"product": "shcs", "system": "inch", "material": "alloy_steel", "grade": "ASTM-A574"},
+    {"product": "shcs", "system": "inch", "material": "ss_18_8", "grade": "ASTM-F593-G1-CW"},
+    {"product": "shcs", "system": "inch", "material": "ss_316", "grade": "ASTM-F593-G2-CW"},
+    {"product": "hex", "system": "metric", "material": "ss_18_8", "grade": "ISO3506-A2-70"},
+    {"product": "hex", "system": "metric", "material": "ss_316", "grade": "ISO3506-A4-70"},
+    {"product": "hex", "system": "inch", "material": "ss_18_8", "grade": "ASTM-F593-G1-CW"},
+    {"product": "hex", "system": "inch", "material": "ss_316", "grade": "ASTM-F593-G2-CW"},
 ]
 INFERRED_GRADE_FLAG = "Grade inferred from material — verify against the product page."
 
@@ -766,19 +812,21 @@ def build():
     ids = [t["id"] for t in threads]
     assert len(ids) == len(set(ids)), "duplicate thread ids"
     grade_list = grades()
-    grade_ids = {g["id"] for g in grade_list}
+    by_id = {g["id"]: g for g in grade_list}
     for m in TITLE_GRADE_MAP:
-        assert m["grade"] in grade_ids, m
+        assert m["grade"] in by_id and m["product"] in by_id[m["grade"]]["products"], m
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generator": "build_standards.py",
         "primary_source": "Shigley's Mechanical Engineering Design, 10th ed. (printed page numbers)",
-        "lookup_rule": "Sp: among grade rows whose size range contains d, use the lowest priority number "
-                       "(1 = Shigley, 2 = standard), preferring rows whose scope covers the thread. A fine-pitch "
-                       "thread below a row's fine_pitch_d_min still uses that row, flagged with fine_pitch_note.",
+        "lookup_rule": "Sp: among grade rows whose size range contains d and whose products include the head "
+                       "type, use the lowest priority number (1 = Shigley, 2 = standard), preferring rows whose "
+                       "scope covers the thread. A fine-pitch thread below a row's fine_pitch_d_min still uses "
+                       "that row, flagged with fine_pitch_note.",
         "fine_pitch_note": FINE_PITCH_NOTE,
         "sources": SOURCES,
         "formulas": FORMULAS,
+        "products": PRODUCTS,
         "threads": threads,
         "grades": grade_list,
         "title_grade_map": TITLE_GRADE_MAP,

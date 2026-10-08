@@ -6,7 +6,8 @@ Checks:
   B. the SPEC §2 validation rows
   C. every Shigley Table 8-1 / 8-2 row that appears in the dataset (±1%)
   D. numbered-size diameters
-  E. grade tables: integrity, Sp lookup for every thread, source cross-checks
+  E. grade tables: integrity, head-type coverage, Sp lookup for every
+     thread and head type, source cross-checks
   F. lubrication, preload fraction and Gamma against SPEC §4 and §6
   G. every unverified value
   H. every value not sourced from Shigley, with its source
@@ -88,10 +89,14 @@ REQUIRED_GRADES = ["ISO-4.6", "ISO-4.8", "ISO-5.8", "ISO-8.8", "ISO-9.8", "ISO-1
                    "SAE-J429-2", "SAE-J429-5", "SAE-J429-8", "ASTM-A574",
                    "ASTM-F593-G1-CW", "ASTM-F593-G2-CW"]
 ROW_KEYS = ["d_min", "d_max", "d_unit", "d_min_exclusive", "d_max_exclusive", "fine_pitch_d_min",
-            "size_text", "value", "unit", "Sy", "method", "source", "source_id", "priority",
+            "products", "size_text", "value", "unit", "Sy", "method", "source", "source_id", "priority",
             "verified", "note"]
 DIRECT = "direct proof strength"
 FROM_SY = "0.85*Sy (Shigley p.434)"
+
+# SPEC §3 head-type applicability: standards that cover socket heads only.
+PRODUCTS = ("shcs", "hex")
+SHCS_ONLY_STANDARDS = {"ASTM A574", "ASTM F837"}
 
 
 class Report:
@@ -136,11 +141,13 @@ def out_of_fine_scope(r, thread):
     return thread["series"] == "fine" and fp is not None and thread["d"] < fp - EPS
 
 
-def resolve(grade, thread):
+def resolve(grade, thread, product="shcs"):
     """Return (best_row, other_matching_rows, reason_if_none, out_of_scope). Same rule as the app."""
     if grade["system"] != thread["system"]:
         return None, [], "system mismatch", False
-    matches = [r for r in grade["rows"] if in_range(thread["d"], r)]
+    if product not in grade["products"]:
+        return None, [], f"grade does not cover {product}", False
+    matches = [r for r in grade["rows"] if in_range(thread["d"], r) and product in r["products"]]
     if not matches:
         return None, [], "no row covers this size", False
     matches.sort(key=lambda r: (r["priority"], out_of_fine_scope(r, thread)))
@@ -236,9 +243,14 @@ def main():
           + (f"; MISSING: {missing}" if missing else ""))
     for g in data["grades"]:
         unit = "MPa" if g["system"] == "metric" else "kpsi"
+        gp = g.get("products") or []
+        rep.ok(gp and set(gp) <= set(PRODUCTS), f"E: {g['id']} products {gp}")
+        expected = ["shcs"] if g["standard"] in SHCS_ONLY_STANDARDS else list(PRODUCTS)
+        rep.ok(gp == expected, f"E: {g['id']} ({g['standard']}) products {gp}, SPEC §3 expects {expected}")
         for r in g["rows"]:
             where = f"{g['id']} [{r['size_text']}]"
             rep.ok(all(k in r for k in ROW_KEYS), f"E: {where} missing keys")
+            rep.ok(r.get("products") and set(r["products"]) <= set(gp), f"E: {where} row products outside grade")
             rep.ok(r["unit"] == unit, f"E: {where} unit {r['unit']}")
             rep.ok(r["method"] in (DIRECT, FROM_SY), f"E: {where} method {r['method']}")
             rep.ok(r["source_id"] in sources, f"E: {where} unknown source {r['source_id']}")
@@ -249,30 +261,47 @@ def main():
                 rep.ok(r["Sy"] is not None and abs(r["value"] - sig(0.85 * r["Sy"])) < 1e-9,
                        f"E: {where} Sp != 0.85*Sy")
     for m in data["title_grade_map"]:
-        rep.ok(m["grade"] in grades, f"E: title map -> unknown grade {m['grade']}")
+        good = m["grade"] in grades and m.get("product") in PRODUCTS
+        rep.ok(good, f"E: title map -> unknown grade or product {m}")
+        if good:
+            rep.ok(m["product"] in grades[m["grade"]]["products"], f"E: title map {m} grade does not cover its product")
+    for material in ("alloy_steel",):
+        rep.ok(not any(m["product"] == "hex" and m["material"] == material for m in data["title_grade_map"]),
+               "E: SPEC §3 forbids inferring a hex head grade from alloy steel")
     print(f"Row integrity and title-to-grade map checked ({sum(len(g['rows']) for g in data['grades'])} rows).")
 
-    used_rows = {}          # id(row) -> list of thread designations resolved to it
-    conflicts, unresolved, extended = [], {}, {}
-    resolved_count = 0
-    for g in data["grades"]:
-        for t in threads:
-            if t["system"] != g["system"]:
-                continue
-            best, others, reason, out_of_scope = resolve(g, t)
-            if best is None or best["value"] is None:
-                why = reason or best["note"]
-                unresolved.setdefault((g["id"], why), []).append(t["designation"])
-                continue
-            resolved_count += 1
-            used_rows.setdefault(id(best), []).append(t["designation"])
-            if out_of_scope:
-                extended.setdefault((g["id"], best["source"], best["value"], best["unit"]), []).append(t["designation"])
-            for o in others:
-                if o["value"] is not None and abs(o["value"] - best["value"]) > 1e-9:
-                    conflicts.append((g["id"], t["designation"], best, o))
+    print("\nHead-type coverage (SPEC §3):")
+    for p in PRODUCTS:
+        ids = [g["id"] for g in data["grades"] if p in g["products"]]
+        print(f"  {p:<5} {len(ids)} grades" + ("" if p == "shcs" else
+              f"; excluded: {', '.join(g['id'] for g in data['grades'] if p not in g['products'])}"))
+    for p in PRODUCTS:
+        rules = [f"{m['system']} {m['material']} -> {m['grade']}" for m in data["title_grade_map"] if m["product"] == p]
+        print(f"  {p:<5} title map: {'; '.join(rules)}")
 
-    print(f"\nSp lookups: {resolved_count} thread/grade pairs resolve to a value.")
+    used_rows = {}          # id(row) -> thread designations resolved to it (ordered, unique)
+    conflicts, unresolved, extended = [], {}, {}
+    resolved_count = {p: 0 for p in PRODUCTS}
+    for g in data["grades"]:
+        for p in g["products"]:
+            for t in threads:
+                if t["system"] != g["system"]:
+                    continue
+                best, others, reason, out_of_scope = resolve(g, t, p)
+                if best is None or best["value"] is None:
+                    why = reason or best["note"]
+                    unresolved.setdefault((g["id"], p, why), []).append(t["designation"])
+                    continue
+                resolved_count[p] += 1
+                used_rows.setdefault(id(best), {})[t["designation"]] = None
+                if out_of_scope:
+                    extended.setdefault((g["id"], best["source"], best["value"], best["unit"]), {})[t["designation"]] = None
+                for o in others:
+                    if o["value"] is not None and abs(o["value"] - best["value"]) > 1e-9:
+                        conflicts.append((g["id"], t["designation"], best, o))
+
+    print(f"\nSp lookups: {resolved_count['shcs']} socket head and {resolved_count['hex']} hex head "
+          "thread/grade pairs resolve to a value.")
     print("\nCross-check disagreements (the higher-priority source is used):")
     if not conflicts:
         print("  none")
@@ -295,8 +324,8 @@ def main():
     rep.ok("{source}" in data.get("fine_pitch_note", ""), "E: fine_pitch_note template missing")
 
     print("\nThread/grade pairs with no Sp (the app shows W2 and asks for Sp):")
-    for (gid, why), sizes in sorted(unresolved.items()):
-        print(f"  {gid}: {why}")
+    for (gid, p, why), sizes in sorted(unresolved.items()):
+        print(f"  {gid} ({p}): {why}")
         print(f"      {len(sizes)} threads: {', '.join(sizes)}")
 
     # ---------------------------------------------------------------- F
@@ -435,6 +464,34 @@ def main():
         ratio = (1 + gg) * 0.75
         rep.ok((ratio > 1) == expect_w1, "I: W1 case")
         print(f"M6 12.9, K {kk}, Gamma {gg}: Fi_max = {ratio:.4f} Fp -> W1 {'fires' if ratio > 1 else 'does not fire'}")
+
+    print("\nHex head (SPEC §9):")
+    g5 = resolve(grades["SAE-J429-5"], q20, "hex")[0]
+    fi = 0.75 * q20["At"] * g5["value"]
+    t = 0.20 * fi * 1000 * 0.25
+    rep.ok(g5["source_id"] == "shigley" and abs(fi - 2.03) / 2.03 < 0.01 and abs(t - 101) / 101 < 0.01, "I: hex Grade 5")
+    print(f"Hex 1/4-20 Grade 5: Sp {g5['value']:g} kpsi ({g5['source']}), Fi = {fi:.3f} kip (SPEC ~2.03), "
+          f"T = {t:.1f} lbf-in (SPEC ~101)")
+    m8 = by_id["M8x1.25"]
+    c88 = resolve(grades["ISO-8.8"], m8, "hex")[0]
+    fi = 0.75 * m8["At"] * c88["value"] / 1000
+    t = 0.20 * fi * 8
+    rep.ok(abs(fi - 15.9) / 15.9 < 0.01 and abs(t - 25.5) / 25.5 < 0.01, "I: hex M8 8.8")
+    print(f"Hex M8x1.25 class 8.8: Sp {c88['value']:g} MPa ({c88['source']}), Fi = {fi:.2f} kN (SPEC ~15.9), "
+          f"T = {t:.2f} N-m (SPEC ~25.5)")
+    ss316 = resolve(grades["ASTM-F593-G2-CW"], by_id["3/8-16 UNC"], "hex")[0]
+    rep.ok(ss316["value"] == 55.25 and ss316["source_id"] == "astm_f593", "I: hex 3/8-16 316")
+    print(f"Hex 3/8-16 316: Sp = {ss316['value']:g} kpsi - {ss316['source']}")
+    small_hex = resolve(grades["ASTM-F593-G1-CW"], by_id["#10-24 UNC"], "hex")[0]
+    small_shcs = resolve(grades["ASTM-F593-G1-CW"], by_id["#10-24 UNC"], "shcs")[0]
+    rep.ok(small_hex["value"] is None and small_hex["verified"] is False, "I: hex #10-24 18-8 null")
+    rep.ok(small_shcs["value"] == 34 and small_shcs["source_id"] == "astm_f837", "I: SHCS #10-24 18-8 unchanged")
+    print(f"#10-24 18-8: hex Sp = {small_hex['value']} (verified {small_hex['verified']}); "
+          f"socket head Sp = {small_shcs['value']:g} kpsi ({small_shcs['source']})")
+    for gid in ("ASTM-A574", "ASTM-F837-G1-CW"):
+        best, _, why, _ = resolve(grades[gid], q20, "hex")
+        rep.ok(best is None, f"I: {gid} must not resolve for hex")
+        print(f"Hex 1/4-20 {gid}: no Sp ({why})")
 
     # ---------------------------------------------------------------- summary
     Report.section("SUMMARY")

@@ -39,16 +39,26 @@ export function outOfFineScope(row, thread) {
   return thread.series === 'fine' && fp != null && thread.d < fp - EPS;
 }
 
-// Proof strength for a grade and thread, using the JSON lookup rule: the
-// lowest priority number wins (1 = Shigley, 2 = governing standard), rows
-// whose scope covers the thread are preferred, and other matching rows are
+const PRODUCT_NAMES = { shcs: 'socket head cap screws', hex: 'hex head cap screws' };
+
+export function coversProduct(item, product) {
+  return !item.products || item.products.includes(product);
+}
+
+// Proof strength for a grade and thread, using the JSON lookup rule: only
+// rows covering the head type (product: 'shcs' | 'hex') count, the lowest
+// priority number wins (1 = Shigley, 2 = governing standard), rows whose
+// scope covers the thread are preferred, and other matching rows are
 // returned as cross-checks. thread = { system, d (native units), series }.
-export function resolveSp(grade, thread, finePitchNote = '') {
+export function resolveSp(grade, thread, finePitchNote = '', product = 'shcs') {
   if (!grade || !thread || !(thread.d > 0)) return null;
   if (grade.system !== thread.system) {
     return { value: null, reason: `${grade.label} is ${grade.system === 'inch' ? 'an inch' : 'a metric'} grade; the thread is ${thread.system}.` };
   }
-  const matches = grade.rows.filter((r) => inRange(thread.d, r));
+  if (!coversProduct(grade, product)) {
+    return { value: null, reason: `${grade.label} does not cover ${PRODUCT_NAMES[product] ?? product}.` };
+  }
+  const matches = grade.rows.filter((r) => inRange(thread.d, r) && coversProduct(r, product));
   if (!matches.length) {
     return { value: null, reason: `${grade.label} has no tabulated proof strength for this size.` };
   }

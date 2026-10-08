@@ -1,7 +1,7 @@
 // UI: DOM wiring only. Parsing lives in parser.js, math in calculator.js.
 
-import { parseTitle, selectGrade } from './parser.js';
-import { UNIT, tensileStressArea, resolveSp, calculate, compareLubricants, warnings } from './calculator.js';
+import { parseTitle, selectGrade, productLabel } from './parser.js';
+import { UNIT, tensileStressArea, resolveSp, coversProduct, calculate, compareLubricants, warnings } from './calculator.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -11,7 +11,8 @@ const EXAMPLES = [
   ['1/4"-20 zinc-plated alloy', 'Zinc-Plated Alloy Steel Socket Head Screw\nUS Origin, 1/4"-20 Thread Size, 1" Long'],
   ['M5 × 0.8 18-8 stainless', 'Black-Oxide 18-8 Stainless Steel Socket Head Screws\nM5 x 0.8 mm Thread Size, 20 mm Long'],
   ['10-32 316 sealing', 'Sealing Socket Head Screw\n316 Stainless Steel with Buna-N O-Ring, 10-32 Thread, 5/8" Long'],
-  ['Grade 5 hex head (out of scope)', 'Medium-Strength Grade 5 Steel Hex Head Screw\nZinc-Plated, 1/4"-20 Thread Size, 3-1/2" Long, Partially Threaded'],
+  ['1/4"-20 Grade 5 hex head', 'Medium-Strength Grade 5 Steel Hex Head Screw\nZinc-Plated, 1/4"-20 Thread Size, 3-1/2" Long, Partially Threaded'],
+  ['Pan head (out of scope)', 'Zinc-Plated Steel Pan Head Phillips Screw\n8-32 Thread, 1-1/8" Long'],
 ];
 
 let data = null;
@@ -20,6 +21,7 @@ const idx = { grades: new Map(), lubes: new Map(), engagement: new Map(), sizes:
 const state = {
   parse: null,
   parseKey: '',
+  product: 'shcs',     // head type: 'shcs' | 'hex' (SPEC §1); socket head unless a hex title says otherwise
   thread: null,        // { id, system, size, series, d, pitch, tpi, At, atUser, custom, pitchSource, pitchShigley }
   gradeId: '',
   gradeInferred: false,
@@ -177,18 +179,30 @@ function defaultThreadForSize(system, size) {
 
 // ------------------------------------------------------------ grade / Sp
 
-function gradesForSystem(system) {
-  return data.grades.filter((g) => g.system === system);
+function gradesFor(system, product) {
+  return data.grades.filter((g) => g.system === system && coversProduct(g, product));
+}
+
+function gradeLabel(g) {
+  return g.label_by_product?.[state.product] ?? g.label;
 }
 
 function currentGrade() {
   return idx.grades.get(state.gradeId) || null;
 }
 
+function applyGradeSelection(sel) {
+  state.gradeId = sel.gradeId || '';
+  state.gradeInferred = sel.inferred;
+  state.gradeConfirmed = false;
+  state.gradeMsg = sel.message;
+  state.spUser = null;
+}
+
 function currentSp() {
   const t = state.thread;
   const g = currentGrade();
-  const resolved = t && g ? resolveSp(g, { system: t.system, d: t.d, series: t.series }, data.fine_pitch_note) : null;
+  const resolved = t && g ? resolveSp(g, { system: t.system, d: t.d, series: t.series }, data.fine_pitch_note, state.product) : null;
   if (state.spUser != null) return { value: state.spUser, user: true, resolved };
   if (resolved && resolved.value != null) return { value: resolved.value, user: false, resolved };
   return { value: null, user: false, resolved };
@@ -242,15 +256,12 @@ function applyParse(text) {
   if (p.thread) setThread(p.thread);
   else state.thread = null;
 
-  const sel = selectGrade(p, data);
-  state.gradeId = sel.gradeId || '';
-  state.gradeInferred = sel.inferred;
-  state.gradeConfirmed = false;
-  state.gradeMsg = sel.message;
-  state.spUser = null;
+  state.product = p.product ?? 'shcs';
+  const sel = selectGrade(p, data, state.product);
+  applyGradeSelection(sel);
 
   // A different screw means a fresh lubrication choice (SPEC §4: never pre-selected).
-  const key = [p.thread?.id, p.material?.key, p.finish?.key, sel.gradeId].join('|');
+  const key = [p.product, p.thread?.id, p.material?.key, p.finish?.key, sel.gradeId].join('|');
   if (key !== state.parseKey) {
     state.parseKey = key;
     state.lubeId = '';
@@ -293,6 +304,10 @@ function buildSizeSelect() {
   );
 }
 
+function buildHeadSelect() {
+  $('head').append(...data.products.options.map((o) => h('option', { value: o.id }, o.label)));
+}
+
 function buildLubeSelect() {
   $('lube').append(h('option', { value: '' }, 'Choose lubrication…'),
     ...data.lubricants.map((l) => h('option', { value: l.id }, l.label)));
@@ -320,7 +335,8 @@ function buildInfo() {
       h('li', {}, `Preload ${F.preload.expression}, f = 0.75 for reusable joints, 0.90 for permanent `, src(F.preload.source, 'shigley')),
       h('li', {}, `Seating torque ${F.torque.expression} `, src(F.torque.source, 'shigley'),
         ' with K from ', src('Shigley Table 8-15, p. 431', 'shigley'), ' (K = 0.20 when unknown ',
-        src('Shigley p. 430', 'shigley'), ')'),
+        src('Shigley p. 430', 'shigley'), '). ', data.products.bearing_face_note, ' ',
+        src(data.products.source, data.products.source_id)),
       h('li', {}, `Preload range ${F.preload_range.expression} `, src('NASA-STD-5020B Sec. 4.3.1, Eqs. 3-4', 'nasa')),
       h('li', {}, 'Screw-locking inserts: T_inst = T_seat + measured running torque (SPEC §5). Running torque adds no preload.'),
     ),
@@ -337,6 +353,7 @@ function buildInfo() {
       h('li', {}, data.lookup_rule),
       h('li', {}, 'Class 8.8 at M16: Shigley Table 8-11 gives 600 MPa, ISO 898-1 gives 580 MPa (d ≤ 16 mm). Shigley is used.'),
       h('li', {}, 'Shigley Table 8-2 prints At = 0.00880 in² for #5-44 UNF; its own formula and ASTM A574/F837 give 0.00830. The formula value is used.'),
+      h('li', {}, 'Hex heads: ASTM A574 and F837 are socket head specifications and are not offered. ASTM F593 covers hex cap screws from 1/4 in; stainless hex heads below 1/4 in have no verified Sp.'),
       h('li', {}, data.reused_insert.note),
     ),
     h('h3', {}, 'Sources'),
@@ -351,6 +368,7 @@ function buildInfo() {
 
 function render() {
   renderParseStatus();
+  renderHead();
   renderThread();
   renderGrade();
   renderFacts();
@@ -376,10 +394,19 @@ function renderParseStatus() {
     box.append(banner('ok', `Read: ${bits.join(' · ')}. Every value below is editable.`, ...p.notes));
     return;
   }
-  const level = p.status === 'not_shcs' && p.thread ? 'warn' : 'danger';
+  const level = p.status === 'out_of_scope' && p.thread ? 'warn' : 'danger';
   const tail = p.thread ? 'Values below were read from the title; check them before use.'
     : 'Choose the size, thread and grade manually below.';
   box.append(banner(level, ...p.errors, ...p.notes, tail));
+}
+
+function renderHead() {
+  $('head').value = state.product;
+  const note = $('head-note');
+  note.replaceChildren();
+  if (state.product === 'hex') {
+    note.append(data.products.bearing_face_note, ' ', src(data.products.source, data.products.source_id));
+  }
 }
 
 function renderThread() {
@@ -438,10 +465,13 @@ function renderGrade() {
   sel.disabled = !t;
   sel.append(h('option', { value: '' }, 'Choose a grade…'));
   if (t) {
-    for (const g of gradesForSystem(t.system)) sel.append(h('option', { value: g.id }, g.label));
+    for (const g of gradesFor(t.system, state.product)) sel.append(h('option', { value: g.id }, gradeLabel(g)));
   }
   sel.append(h('option', { value: 'custom' }, 'Other: enter Sp'));
-  if (state.gradeId && state.gradeId !== 'custom' && !(t && currentGrade()?.system === t.system)) state.gradeId = '';
+  const g0 = currentGrade();
+  if (state.gradeId && state.gradeId !== 'custom' && !(t && g0?.system === t.system && coversProduct(g0, state.product))) {
+    state.gradeId = '';
+  }
   sel.value = state.gradeId;
 
   const msg = $('grade-msg');
@@ -493,7 +523,7 @@ function renderFacts() {
   const p = state.parse;
   if (!p) return;
   const add = (k, v) => v && dl.append(h('dt', {}, k), h('dd', {}, v));
-  add('Head', p.headType ? (p.isSHCS ? 'socket head cap screw' : p.headType) : 'not found');
+  add('Head', p.headType ? (p.inScope ? productLabel(data, p.product).toLowerCase() : p.headType) : 'not found');
   add('Material', p.material?.text || 'not found');
   add('Stated grade', p.statedGrade?.text);
   add('Finish', p.finish?.text);
@@ -675,7 +705,7 @@ function renderInputsUsed(ctx) {
     sp.user ? src('user input', 'user') : [src(r.source, r.sourceId),
       r.method !== 'direct proof strength' ? src(`0.85 × Sy`, 'shigley') : null,
       r.scopeNote ? src('outside the standard\'s fine-pitch scope', 'user') : null],
-    ctx.t && currentGrade() ? h('span', { class: 'muted' }, ` (${currentGrade().label})`) : null));
+    ctx.t && currentGrade() ? h('span', { class: 'muted' }, ` (${gradeLabel(currentGrade())})`) : null));
   if (ctx.lube && ctx.K != null) {
     items.push(h('li', {}, 'K = ', h('b', {}, ctx.lube.id === 'custom' ? String(ctx.K) : ctx.K.toFixed(2)), ` (${ctx.lube.label}) `,
       ctx.lube.id === 'custom' ? src('user input', 'user') : src(ctx.lube.K.source.replace(' (not Shigley)', ''), ctx.lube.K.source_id)));
@@ -745,6 +775,20 @@ function renderCompare(ctx) {
 
 function bindEvents() {
   $('title').addEventListener('input', onTitleInput);
+
+  // SPEC §3: a head-type change re-runs the inference unless the grade came
+  // from the title or the user; a grade that no longer applies is cleared.
+  $('head').addEventListener('change', (e) => {
+    state.product = e.target.value;
+    const g = currentGrade();
+    if (state.parse && (state.gradeInferred || !state.gradeId)) {
+      applyGradeSelection(selectGrade(state.parse, data, state.product));
+    } else if (g && !coversProduct(g, state.product)) {
+      applyGradeSelection({ gradeId: null, inferred: false,
+        message: `${gradeLabel(g)} does not cover ${productLabel(data, state.product).toLowerCase()}s. Choose a grade.` });
+    }
+    render();
+  });
 
   $('size').addEventListener('change', (e) => {
     const [system, size] = e.target.value.split('|');
@@ -844,6 +888,7 @@ async function init() {
   for (const l of data.lubricants) idx.lubes.set(l.id, l);
   for (const e of data.engagement) idx.engagement.set(e.id, e);
   buildExamples();
+  buildHeadSelect();
   buildSizeSelect();
   buildLubeSelect();
   buildEngagementSelect();

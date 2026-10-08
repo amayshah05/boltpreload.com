@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
-  UNIT, tensileStressArea, resolveSp, calculate, torque, compareLubricants, warnings,
+  UNIT, tensileStressArea, resolveSp, coversProduct, calculate, torque, compareLubricants, warnings,
 } from '../js/calculator.js';
 
 const data = JSON.parse(fs.readFileSync(new URL('../data/fastener_standards.json', import.meta.url), 'utf8'));
@@ -13,7 +13,7 @@ const thread = (id) => data.threads.find((t) => t.id === id);
 const grade = (id) => data.grades.find((g) => g.id === id);
 const lube = (id) => data.lubricants.find((l) => l.id === id);
 const engagement = (id) => data.engagement.find((e) => e.id === id);
-const sp = (gradeId, threadId) => resolveSp(grade(gradeId), thread(threadId), data.fine_pitch_note);
+const sp = (gradeId, threadId, product) => resolveSp(grade(gradeId), thread(threadId), data.fine_pitch_note, product);
 
 function close(actual, expected, rel, msg = '') {
   assert.ok(Math.abs(actual - expected) <= rel * Math.abs(expected),
@@ -87,6 +87,80 @@ test('running torque is ignored unless the insert is screw-locking', () => {
   const r = calculate({ At: t.At, Sp: 970, d: t.d, f: 0.75, K: 0.20, lockingInsert: false, runningTorque: 1000 });
   assert.equal(r.Tinst, null);
   assert.equal(r.Tprev, null);
+});
+
+// ------------------------------------------------------------ hex head (SPEC §9)
+
+test('SPEC 9 hex: 1/4"-20 Grade 5 (Shigley T8-9), f 0.75, K 0.20 -> Fi ~ 2.03 kip, T ~ 101 lbf-in', () => {
+  const s = sp('SAE-J429-5', '1/4-20 UNC', 'hex');
+  assert.equal(s.value, 85);
+  assert.equal(s.fromShigley, true);
+  const r = calculate({ ...inchSI(thread('1/4-20 UNC'), s.value), f: 0.75, K: 0.20 });
+  close(r.Fi / UNIT.N_PER_LBF / 1000, 2.03, 0.01, 'Fi (kip)');
+  close(r.Tseat / UNIT.NMM_PER_LBFIN, 101, 0.01, 'T (lbf-in)');
+});
+
+test('SPEC 9 hex: M8 x 1.25 class 8.8 (ISO 898-1), f 0.75, K 0.20 -> Fi ~ 15.9 kN, T ~ 25.5 N-m', () => {
+  const t = thread('M8x1.25');
+  const s = sp('ISO-8.8', 'M8x1.25', 'hex');
+  assert.equal(s.value, 580);
+  assert.equal(s.sourceId, 'iso_898_1');
+  const r = calculate({ At: t.At, Sp: s.value, d: t.d, f: 0.75, K: 0.20 });
+  close(r.Fi / 1000, 15.9, 0.01, 'Fi (kN)');
+  close(r.Tseat / 1000, 25.5, 0.01, 'T (N-m)');
+});
+
+test('SPEC 9 hex: 3/8"-16 316 stainless from F593 Group 2 CW, same as socket head', () => {
+  const s = sp('ASTM-F593-G2-CW', '3/8-16 UNC', 'hex');
+  assert.equal(s.value, 55.25);
+  assert.equal(s.sourceId, 'astm_f593');
+  assert.equal(s.Sy, 65);
+  assert.equal(sp('ASTM-F593-G2-CW', '3/8-16 UNC', 'shcs').value, 55.25);
+});
+
+test('SPEC 9 hex: #10-24 18-8 has no Sp (W2); socket head keeps the F837 value', () => {
+  const hex = sp('ASTM-F593-G1-CW', '#10-24 UNC', 'hex');
+  assert.equal(hex.value, null);
+  assert.equal(hex.row.verified, false);
+  assert.match(hex.reason, /F837 covers socket heads only/);
+  assert.ok(warnings({ spMissing: hex.value == null }).some((w) => w.id === 'W2'));
+  const shcs = sp('ASTM-F593-G1-CW', '#10-24 UNC', 'shcs');
+  assert.equal(shcs.value, 34);
+  assert.equal(shcs.sourceId, 'astm_f837');
+});
+
+test('SPEC 9 hex: ASTM A574 and F837 give no Sp, with a reason, and are not offered', () => {
+  for (const id of ['ASTM-A574', 'ASTM-F837-G1-CW', 'ASTM-F837-G2-CW1']) {
+    const s = sp(id, '1/4-20 UNC', 'hex');
+    assert.equal(s.value, null, id);
+    assert.match(s.reason, /does not cover hex head cap screws/, id);
+  }
+  const offered = data.grades.filter((g) => coversProduct(g, 'hex')).map((g) => g.id);
+  assert.ok(!offered.some((id) => id === 'ASTM-A574' || id.startsWith('ASTM-F837')));
+  assert.equal(offered.length, 16);
+  assert.equal(data.grades.filter((g) => coversProduct(g, 'shcs')).length, data.grades.length);
+});
+
+test('SPEC 9 socket head regression: every lookup without a head type equals the socket head lookup', () => {
+  for (const g of data.grades) {
+    for (const t of data.threads) {
+      assert.deepEqual(sp(g.id, t.id), sp(g.id, t.id, 'shcs'), `${g.id} ${t.id}`);
+    }
+  }
+});
+
+test('hex lookups differ from socket head only for A574, F837 and F593 below 1/4 in', () => {
+  const differs = new Set();
+  for (const g of data.grades) {
+    for (const t of data.threads) {
+      const a = sp(g.id, t.id, 'shcs');
+      const b = sp(g.id, t.id, 'hex');
+      if (a?.value !== b?.value) differs.add(g.id.startsWith('ASTM-F593') ? `${g.id} < 1/4` : g.id);
+      if (g.id.startsWith('ASTM-F593') && a?.value !== b?.value) assert.ok(t.d < 0.25, `${g.id} ${t.id}`);
+    }
+  }
+  assert.deepEqual([...differs].sort(), ['ASTM-A574', 'ASTM-F593-G1-CW < 1/4', 'ASTM-F593-G2-CW < 1/4',
+    'ASTM-F837-G1-CW', 'ASTM-F837-G1-CW1', 'ASTM-F837-G2-CW', 'ASTM-F837-G2-CW1']);
 });
 
 // ------------------------------------------------------------ At (SPEC §2)

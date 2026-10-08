@@ -1,8 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "generator": "build_standards.py",
   "primary_source": "Shigley's Mechanical Engineering Design, 10th ed. (printed page numbers)",
-  "lookup_rule": "Sp: among grade rows whose size range contains d, use the lowest priority number (1 = Shigley, 2 = standard), preferring rows whose scope covers the thread. A fine-pitch thread below a row's fine_pitch_d_min still uses that row, flagged with fine_pitch_note.",
+  "lookup_rule": "Sp: among grade rows whose size range contains d and whose products include the head type, use the lowest priority number (1 = Shigley, 2 = standard), preferring rows whose scope covers the thread. A fine-pitch thread below a row's fine_pitch_d_min still uses that row, flagged with fine_pitch_note.",
   "fine_pitch_note": "{source} covers fine pitch from M8 x 1 only. The class value is applied to this thread by extension: verify with the supplier or enter Sp.",
   "sources": {
     "shigley": {
@@ -154,6 +154,23 @@
       "source": "Shigley p. 434 (for materials not in Tables 8-9 to 8-11)",
       "source_id": "shigley"
     }
+  },
+  "products": {
+    "options": [
+      {
+        "id": "shcs",
+        "label": "Socket head cap screw",
+        "default": true
+      },
+      {
+        "id": "hex",
+        "label": "Hex head cap screw",
+        "default": false
+      }
+    ],
+    "bearing_face_note": "Shigley's Eq. 8-26 takes the bearing face as a hex washer face, 1.5d across flats (dc = 1.25d), so hex heads use the same K as socket heads. Flanged, hex washer and heavy hex heads bear on a larger face and are out of scope.",
+    "source": "Shigley p. 430 (derivation of Eq. 8-26)",
+    "source_id": "shigley"
   },
   "threads": [
     {
@@ -2576,6 +2593,10 @@
       "system": "metric",
       "standard": "ISO 898-1",
       "material": "low or medium carbon steel",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "class 4.6",
         "property class 4.6",
@@ -2590,6 +2611,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M5-M36",
           "value": 225,
           "unit": "MPa",
@@ -2608,6 +2633,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39",
           "value": 225,
           "unit": "MPa",
@@ -2627,6 +2656,10 @@
       "system": "metric",
       "standard": "ISO 898-1",
       "material": "low or medium carbon steel",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "class 4.8",
         "property class 4.8",
@@ -2641,6 +2674,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M16",
           "value": 310,
           "unit": "MPa",
@@ -2659,6 +2696,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39",
           "value": 310,
           "unit": "MPa",
@@ -2678,6 +2719,10 @@
       "system": "metric",
       "standard": "ISO 898-1",
       "material": "low or medium carbon steel",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "class 5.8",
         "property class 5.8",
@@ -2692,6 +2737,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M5-M24",
           "value": 380,
           "unit": "MPa",
@@ -2710,6 +2759,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39",
           "value": 380,
           "unit": "MPa",
@@ -2729,6 +2782,10 @@
       "system": "metric",
       "standard": "ISO 898-1",
       "material": "medium carbon steel, quenched and tempered",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "class 8.8",
         "property class 8.8",
@@ -2743,6 +2800,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M16-M36",
           "value": 600,
           "unit": "MPa",
@@ -2761,6 +2822,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "d <= 16 mm",
           "value": 580,
           "unit": "MPa",
@@ -2779,6 +2844,10 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "d > 16 mm",
           "value": 600,
           "unit": "MPa",
@@ -2798,6 +2867,10 @@
       "system": "metric",
       "standard": "ISO 898-1",
       "material": "medium carbon steel, quenched and tempered",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "class 9.8",
         "property class 9.8",
@@ -2812,6 +2885,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M16",
           "value": 650,
           "unit": "MPa",
@@ -2830,6 +2907,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "d <= 16 mm",
           "value": 650,
           "unit": "MPa",
@@ -2848,6 +2929,10 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "d > 16 mm",
           "value": null,
           "unit": "MPa",
@@ -2867,6 +2952,10 @@
       "system": "metric",
       "standard": "ISO 898-1",
       "material": "low-carbon martensite, quenched and tempered",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "class 10.9",
         "property class 10.9",
@@ -2881,6 +2970,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M5-M36",
           "value": 830,
           "unit": "MPa",
@@ -2899,6 +2992,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39",
           "value": 830,
           "unit": "MPa",
@@ -2918,6 +3015,10 @@
       "system": "metric",
       "standard": "ISO 898-1",
       "material": "alloy steel, quenched and tempered",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "class 12.9",
         "property class 12.9",
@@ -2932,6 +3033,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M36",
           "value": 970,
           "unit": "MPa",
@@ -2950,6 +3055,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39",
           "value": 970,
           "unit": "MPa",
@@ -2969,6 +3078,10 @@
       "system": "metric",
       "standard": "ISO 3506-1",
       "material": "austenitic stainless steel (18-8 / 304 type)",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "A2-70",
         "a2-70"
@@ -2982,6 +3095,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39 coarse; fine M8x1 and larger",
           "value": 382.5,
           "unit": "MPa",
@@ -3001,6 +3118,10 @@
       "system": "metric",
       "standard": "ISO 3506-1",
       "material": "austenitic stainless steel (316 type)",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "A4-70",
         "a4-70"
@@ -3014,6 +3135,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39 coarse; fine M8x1 and larger",
           "value": 382.5,
           "unit": "MPa",
@@ -3033,6 +3158,10 @@
       "system": "metric",
       "standard": "ISO 3506-1",
       "material": "austenitic stainless steel (18-8 / 304 type)",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "A2-80",
         "a2-80"
@@ -3046,6 +3175,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39 coarse; fine M8x1 and larger",
           "value": 510.0,
           "unit": "MPa",
@@ -3065,6 +3198,10 @@
       "system": "metric",
       "standard": "ISO 3506-1",
       "material": "austenitic stainless steel (316 type)",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "A4-80",
         "a4-80"
@@ -3078,6 +3215,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": 8,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "M1.6-M39 coarse; fine M8x1 and larger",
           "value": 510.0,
           "unit": "MPa",
@@ -3097,6 +3238,10 @@
       "system": "inch",
       "standard": "SAE J429",
       "material": "low or medium carbon steel",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "grade 2",
         "sae grade 2",
@@ -3111,6 +3256,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1/4-3/4 in",
           "value": 55,
           "unit": "kpsi",
@@ -3129,6 +3278,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "7/8-1-1/2 in",
           "value": 33,
           "unit": "kpsi",
@@ -3147,6 +3300,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1/4 thru 3/4 in",
           "value": 55,
           "unit": "kpsi",
@@ -3165,6 +3322,10 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "over 3/4 thru 1-1/2 in",
           "value": 33,
           "unit": "kpsi",
@@ -3183,6 +3344,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": true,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "below 1/4 in",
           "value": null,
           "unit": "kpsi",
@@ -3202,6 +3367,10 @@
       "system": "inch",
       "standard": "SAE J429",
       "material": "medium carbon steel, quenched and tempered",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "grade 5",
         "sae grade 5",
@@ -3216,6 +3385,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1/4-1 in",
           "value": 85,
           "unit": "kpsi",
@@ -3234,6 +3407,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1-1/8-1-1/2 in",
           "value": 74,
           "unit": "kpsi",
@@ -3252,6 +3429,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1/4 thru 1 in",
           "value": 85,
           "unit": "kpsi",
@@ -3270,6 +3451,10 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "over 1 thru 1-1/2 in",
           "value": 74,
           "unit": "kpsi",
@@ -3288,6 +3473,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": true,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "below 1/4 in",
           "value": null,
           "unit": "kpsi",
@@ -3307,6 +3496,10 @@
       "system": "inch",
       "standard": "SAE J429",
       "material": "medium-carbon alloy steel, quenched and tempered",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "aliases": [
         "grade 8",
         "sae grade 8",
@@ -3321,6 +3514,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1/4-1-1/2 in",
           "value": 120,
           "unit": "kpsi",
@@ -3339,6 +3536,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1/4 thru 1-1/2 in",
           "value": 120,
           "unit": "kpsi",
@@ -3357,6 +3558,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": true,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "below 1/4 in",
           "value": null,
           "unit": "kpsi",
@@ -3376,11 +3581,14 @@
       "system": "inch",
       "standard": "ASTM A574",
       "material": "alloy steel, quenched and tempered",
+      "products": [
+        "shcs"
+      ],
       "aliases": [
         "a574",
         "astm a574"
       ],
-      "note": "Not in Shigley Table 8-10.",
+      "note": "Not in Shigley Table 8-10. Socket head cap screws only.",
       "rows": [
         {
           "d_min": 0.06,
@@ -3389,6 +3597,9 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "0.500 in and smaller",
           "value": 140,
           "unit": "kpsi",
@@ -3407,6 +3618,9 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "larger than 0.500 in",
           "value": 135,
           "unit": "kpsi",
@@ -3423,14 +3637,21 @@
     {
       "id": "ASTM-F593-G1-CW",
       "label": "18-8 stainless, condition CW (ASTM F593 Group 1; F837 below 1/4 in)",
+      "label_by_product": {
+        "hex": "18-8 stainless, condition CW (ASTM F593 Group 1)"
+      },
       "system": "inch",
       "standard": "ASTM F593 / ASTM F837",
       "material": "austenitic stainless steel (18-8)",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "condition": "CW (cold worked). F593: the condition furnished unless otherwise specified. F837: no default; CW is the lower of its two cold-worked conditions.",
       "aliases": [
         "f593 group 1"
       ],
-      "note": "F593 covers bolts, hex cap screws and studs from 1/4 to 1-1/2 in. Below 1/4 in the stainless socket-head-cap-screw specification ASTM F837 (condition CW) is used.",
+      "note": "F593 covers bolts, hex cap screws and studs from 1/4 to 1-1/2 in. Below 1/4 in the stainless socket-head-cap-screw specification ASTM F837 (condition CW) is used for socket heads; hex heads below 1/4 in have no value.",
       "rows": [
         {
           "d_min": 0.25,
@@ -3439,6 +3660,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1/4-5/8 in",
           "value": 55.25,
           "unit": "kpsi",
@@ -3457,6 +3682,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "3/4-1-1/2 in",
           "value": 38.25,
           "unit": "kpsi",
@@ -3475,6 +3704,9 @@
           "d_min_exclusive": false,
           "d_max_exclusive": true,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "#0 to below 1/4 in (F837)",
           "value": 34.0,
           "unit": "kpsi",
@@ -3485,20 +3717,48 @@
           "priority": 2,
           "verified": true,
           "note": "F837 gives machined-specimen yield 40 ksi min, no proof load."
+        },
+        {
+          "d_min": 0.06,
+          "d_max": 0.25,
+          "d_unit": "in",
+          "d_min_exclusive": false,
+          "d_max_exclusive": true,
+          "fine_pitch_d_min": null,
+          "products": [
+            "hex"
+          ],
+          "size_text": "#0 to below 1/4 in (hex head)",
+          "value": null,
+          "unit": "kpsi",
+          "Sy": null,
+          "method": "0.85*Sy (Shigley p.434)",
+          "source": "ASTM F593 scope (1/4-1-1/2 in)",
+          "source_id": "astm_f593",
+          "priority": 2,
+          "verified": false,
+          "note": "ASTM F593 covers hex cap screws from 1/4 in, and ASTM F837 covers socket heads only. No verified proof strength for stainless hex heads below 1/4 in; enter Sp from supplier data."
         }
       ]
     },
     {
       "id": "ASTM-F593-G2-CW",
       "label": "316 stainless, condition CW (ASTM F593 Group 2; F837 below 1/4 in)",
+      "label_by_product": {
+        "hex": "316 stainless, condition CW (ASTM F593 Group 2)"
+      },
       "system": "inch",
       "standard": "ASTM F593 / ASTM F837",
       "material": "austenitic stainless steel (316)",
+      "products": [
+        "shcs",
+        "hex"
+      ],
       "condition": "CW (cold worked). F593: the condition furnished unless otherwise specified. F837: no default; CW is the lower of its two cold-worked conditions.",
       "aliases": [
         "f593 group 2"
       ],
-      "note": "F593 covers bolts, hex cap screws and studs from 1/4 to 1-1/2 in. Below 1/4 in the stainless socket-head-cap-screw specification ASTM F837 (condition CW) is used.",
+      "note": "F593 covers bolts, hex cap screws and studs from 1/4 to 1-1/2 in. Below 1/4 in the stainless socket-head-cap-screw specification ASTM F837 (condition CW) is used for socket heads; hex heads below 1/4 in have no value.",
       "rows": [
         {
           "d_min": 0.25,
@@ -3507,6 +3767,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "1/4-5/8 in",
           "value": 55.25,
           "unit": "kpsi",
@@ -3525,6 +3789,10 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs",
+            "hex"
+          ],
           "size_text": "3/4-1-1/2 in",
           "value": 38.25,
           "unit": "kpsi",
@@ -3543,6 +3811,9 @@
           "d_min_exclusive": false,
           "d_max_exclusive": true,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "#0 to below 1/4 in (F837)",
           "value": 34.0,
           "unit": "kpsi",
@@ -3553,6 +3824,27 @@
           "priority": 2,
           "verified": true,
           "note": "F837 gives machined-specimen yield 40 ksi min, no proof load."
+        },
+        {
+          "d_min": 0.06,
+          "d_max": 0.25,
+          "d_unit": "in",
+          "d_min_exclusive": false,
+          "d_max_exclusive": true,
+          "fine_pitch_d_min": null,
+          "products": [
+            "hex"
+          ],
+          "size_text": "#0 to below 1/4 in (hex head)",
+          "value": null,
+          "unit": "kpsi",
+          "Sy": null,
+          "method": "0.85*Sy (Shigley p.434)",
+          "source": "ASTM F593 scope (1/4-1-1/2 in)",
+          "source_id": "astm_f593",
+          "priority": 2,
+          "verified": false,
+          "note": "ASTM F593 covers hex cap screws from 1/4 in, and ASTM F837 covers socket heads only. No verified proof strength for stainless hex heads below 1/4 in; enter Sp from supplier data."
         }
       ]
     },
@@ -3562,6 +3854,9 @@
       "system": "inch",
       "standard": "ASTM F837",
       "material": "austenitic stainless steel (18-8)",
+      "products": [
+        "shcs"
+      ],
       "condition": "CW",
       "aliases": [
         "f837 group 1 cw"
@@ -3575,6 +3870,9 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "0.060-0.750 in",
           "value": 34.0,
           "unit": "kpsi",
@@ -3593,6 +3891,9 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "over 0.750 in",
           "value": null,
           "unit": "kpsi",
@@ -3612,6 +3913,9 @@
       "system": "inch",
       "standard": "ASTM F837",
       "material": "austenitic stainless steel (18-8)",
+      "products": [
+        "shcs"
+      ],
       "condition": "CW1",
       "aliases": [
         "f837 group 1 cw1"
@@ -3625,6 +3929,9 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "0.060-0.750 in",
           "value": 55.25,
           "unit": "kpsi",
@@ -3643,6 +3950,9 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "over 0.750 in",
           "value": null,
           "unit": "kpsi",
@@ -3662,6 +3972,9 @@
       "system": "inch",
       "standard": "ASTM F837",
       "material": "austenitic stainless steel (316)",
+      "products": [
+        "shcs"
+      ],
       "condition": "CW",
       "aliases": [
         "f837 group 2 cw"
@@ -3675,6 +3988,9 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "0.060-0.750 in",
           "value": 34.0,
           "unit": "kpsi",
@@ -3693,6 +4009,9 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "over 0.750 in",
           "value": null,
           "unit": "kpsi",
@@ -3712,6 +4031,9 @@
       "system": "inch",
       "standard": "ASTM F837",
       "material": "austenitic stainless steel (316)",
+      "products": [
+        "shcs"
+      ],
       "condition": "CW1",
       "aliases": [
         "f837 group 2 cw1"
@@ -3725,6 +4047,9 @@
           "d_min_exclusive": false,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "0.060-0.750 in",
           "value": 55.25,
           "unit": "kpsi",
@@ -3743,6 +4068,9 @@
           "d_min_exclusive": true,
           "d_max_exclusive": false,
           "fine_pitch_d_min": null,
+          "products": [
+            "shcs"
+          ],
           "size_text": "over 0.750 in",
           "value": null,
           "unit": "kpsi",
@@ -3759,31 +4087,61 @@
   ],
   "title_grade_map": [
     {
+      "product": "shcs",
       "system": "metric",
       "material": "alloy_steel",
       "grade": "ISO-12.9"
     },
     {
+      "product": "shcs",
       "system": "metric",
       "material": "ss_18_8",
       "grade": "ISO3506-A2-70"
     },
     {
+      "product": "shcs",
       "system": "metric",
       "material": "ss_316",
       "grade": "ISO3506-A4-70"
     },
     {
+      "product": "shcs",
       "system": "inch",
       "material": "alloy_steel",
       "grade": "ASTM-A574"
     },
     {
+      "product": "shcs",
       "system": "inch",
       "material": "ss_18_8",
       "grade": "ASTM-F593-G1-CW"
     },
     {
+      "product": "shcs",
+      "system": "inch",
+      "material": "ss_316",
+      "grade": "ASTM-F593-G2-CW"
+    },
+    {
+      "product": "hex",
+      "system": "metric",
+      "material": "ss_18_8",
+      "grade": "ISO3506-A2-70"
+    },
+    {
+      "product": "hex",
+      "system": "metric",
+      "material": "ss_316",
+      "grade": "ISO3506-A4-70"
+    },
+    {
+      "product": "hex",
+      "system": "inch",
+      "material": "ss_18_8",
+      "grade": "ASTM-F593-G1-CW"
+    },
+    {
+      "product": "hex",
       "system": "inch",
       "material": "ss_316",
       "grade": "ASTM-F593-G2-CW"
